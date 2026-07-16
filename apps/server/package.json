@@ -4,9 +4,12 @@
     "private": true,
     "type": "module",
     "scripts": {
+        "predev": "pnpm --filter @mafia/shared build",
         "dev": "tsx watch src/index.ts",
+        "prebuild": "pnpm --filter @mafia/shared build",
         "build": "tsc",
         "start": "node dist/index.js",
+        "pretest": "pnpm --filter @mafia/shared build",
         "test": "vitest"
     },
     "dependencies": {
