@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: mafia-server
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter server build
+    startCommand: pnpm --filter server start
+    healthCheckPath: /health
+    envVars:
+      - key: CORS_ORIGIN
+        value: http://localhost:5173
+      - key: NODE_VERSION
+        value: 22

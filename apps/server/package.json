@@ -1,0 +1,31 @@
+{
+    "name": "server",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "tsx watch src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "test": "vitest"
+    },
+    "dependencies": {
+        "@mafia/shared": "workspace:*",
+        "cors": "^2.8.5",
+        "express": "^5.1.0",
+        "helmet": "^8.0.0",
+        "nanoid": "^5.1.0",
+        "socket.io": "^4.8.0",
+        "zod": "^3.25.0"
+    },
+    "devDependencies": {
+        "@types/cors": "^2",
+        "@types/express": "^5",
+        "@types/node": "^20",
+        "@types/socket.io-client": "^3.0.0",
+        "socket.io-client": "^4.8.3",
+        "tsx": "^4.20.0",
+        "typescript": "^5",
+        "vitest": "^3.2.0"
+    }
+}

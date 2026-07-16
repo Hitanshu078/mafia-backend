@@ -1,0 +1,11 @@
+{
+    "name": "mafia-monorepo",
+    "version": "1.0.0",
+    "private": true,
+    "packageManager": "pnpm@11.1.2",
+    "scripts": {
+        "dev": "pnpm run --parallel dev:client dev:server",
+        "dev:client": "pnpm --filter client dev",
+        "dev:server": "pnpm --filter server dev"
+    }
+}
