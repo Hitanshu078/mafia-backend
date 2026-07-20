@@ -50,7 +50,6 @@ export const PlayerSchema = z.object({
 export const RoomSettingsSchema = z.object({
     discussionTimer: z.number(),
     voteTimer: z.number(),
-    nightTimer: z.number(),
     roleRevealOnDeath: z.boolean(),
     allowHostExtension: z.boolean(),
     soundEffects: z.boolean(),
@@ -111,9 +110,12 @@ export const ClientEventsSchema = {
     'game:start': z.undefined(),
     'game:cancel_start': z.undefined(),
     'game:acknowledge_role': z.undefined(),
-    'game:night_action': z.object({ targetId: z.string() }),
-    'game:vote': z.object({ targetId: z.string() }),
+    // targetId: null means "retract my current selection" — night/vote
+    // choices are freely changeable until the round resolves.
+    'game:night_action': z.object({ targetId: z.string().nullable() }),
+    'game:vote': z.object({ targetId: z.string().nullable() }),
     'game:extend_timer': z.undefined(),
+    'game:end_discussion': z.undefined(),
     'game:play_again': z.undefined(),
     'player:rejoin': z.object({ sessionToken: z.string() }),
 } as const;

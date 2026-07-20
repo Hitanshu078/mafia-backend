@@ -9,6 +9,7 @@ import {
     resolveVotes,
     tryResolveNightEarly,
     extendDiscussion,
+    endDiscussion,
     resetRoomToLobby,
 } from '../game/engine.js';
 
@@ -82,6 +83,23 @@ export function registerGameHandlers(socket: Sock, io: IO): void {
         const { room, player: actor } = found;
         if (room.phase !== 'night' || !actor.isAlive) return;
 
+        // targetId: null retracts the actor's current choice — mafia/doctor
+        // targets are freely changeable up until the round resolves. The
+        // detective's inspect is a one-shot reveal (see the 'detective' case
+        // below) and has nothing meaningful to retract.
+        if (data.targetId === null) {
+            if (actor.role === 'mafia') {
+                room.mafiaVotes.delete(actor.playerId);
+                actor.nightActionDone = false;
+            } else if (actor.role === 'doctor') {
+                room.doctorTarget = null;
+                actor.nightActionDone = false;
+            }
+            roomManager.touch(room);
+            socket.emit('game:night_ack', { success: true });
+            return;
+        }
+
         const target = room.players.get(data.targetId);
         if (!target?.isAlive) {
             socket.emit('game:night_ack', { success: false });
@@ -96,6 +114,8 @@ export function registerGameHandlers(socket: Sock, io: IO): void {
                     socket.emit('game:night_ack', { success: false });
                     return;
                 }
+                // Map.set overwrites any earlier target this actor picked —
+                // mafia is free to change their mind until night resolves.
                 room.mafiaVotes.set(actor.playerId, target.playerId);
                 actor.nightActionDone = true;
                 socket.emit('game:night_ack', { success: true });
@@ -107,6 +127,7 @@ export function registerGameHandlers(socket: Sock, io: IO): void {
                     socket.emit('game:night_ack', { success: false });
                     return;
                 }
+                // Same overwrite-freely semantics as mafia, above.
                 room.doctorTarget = target.playerId;
                 actor.nightActionDone = true;
                 socket.emit('game:night_ack', { success: true });
@@ -114,6 +135,11 @@ export function registerGameHandlers(socket: Sock, io: IO): void {
             }
 
             case 'detective': {
+                // Deliberately final on the first successful call: the result
+                // is revealed immediately, so allowing a second investigate
+                // per night (by "changing" targets) would break the
+                // one-inspection-per-night rule. This is the one role where
+                // "select" and "commit" are the same action by design.
                 if (room.detectiveUsed.has(actor.playerId)) return;
                 room.detectiveUsed.add(actor.playerId);
                 actor.nightActionDone = true;
@@ -145,17 +171,37 @@ export function registerGameHandlers(socket: Sock, io: IO): void {
         const found = roomManager.getPlayerBySocket(socket.id);
         if (!found) return;
         const { room, player: voter } = found;
-        if (room.phase !== 'voting' || !voter.isAlive || voter.hasVoted) return;
+        if (room.phase !== 'voting' || !voter.isAlive) return;
+
+        const alive = Array.from(room.players.values()).filter(p => p.isAlive);
+
+        // targetId: null retracts the current vote (covers both "deselect"
+        // and the explicit Abstain action — either way resolveVotes' own
+        // end-of-round fill-in treats a missing vote as an abstain).
+        if (data.targetId === null) {
+            room.votes.delete(voter.playerId);
+            voter.hasVoted = false;
+            voter.voteTarget = null;
+            roomManager.touch(room);
+
+            io.to(room.code).emit('game:vote_count', {
+                votesIn: room.votes.size,
+                totalVoters: alive.length,
+            });
+            return;
+        }
 
         const target = room.players.get(data.targetId);
         if (!target?.isAlive || target.playerId === voter.playerId) return;
 
+        // Map.set overwrites any earlier vote this voter cast — votes are
+        // freely changeable up until the round resolves, exactly like
+        // mafia/doctor night actions.
         room.votes.set(voter.playerId, target.playerId);
         voter.hasVoted = true;
         voter.voteTarget = target.playerId;
         roomManager.touch(room);
 
-        const alive = Array.from(room.players.values()).filter(p => p.isAlive);
         io.to(room.code).emit('game:vote_count', {
             votesIn: room.votes.size,
             totalVoters: alive.length,
@@ -178,6 +224,16 @@ export function registerGameHandlers(socket: Sock, io: IO): void {
         extendDiscussion(room, io);
     });
 
+    socket.on('game:end_discussion', () => {
+        const found = roomManager.getPlayerBySocket(socket.id);
+        if (!found) return;
+        const { room, player } = found;
+        if (room.hostId !== player.playerId) return;
+
+        roomManager.touch(room);
+        endDiscussion(room, io);
+    });
+
     // ── Post-Game ─────────────────────────────────────────────────────────────
 
     socket.on('game:play_again', () => {
@@ -186,7 +242,7 @@ export function registerGameHandlers(socket: Sock, io: IO): void {
         const { room, player } = found;
         if (room.hostId !== player.playerId || room.phase !== 'game_over') return;
 
-        resetRoomToLobby(room);
+        resetRoomToLobby(room, io);
         roomManager.touch(room);
         broadcastRoomUpdate(io, room);
     });

@@ -16,6 +16,9 @@ import { broadcastRoomUpdate } from '../utils/broadcast.js';
 
 type IO = Server<ClientEvents, ServerEvents>;
 
+// Reserved vote-tally key for auto/voluntary abstains — never a real playerId.
+const ABSTAIN_KEY = 'abstain';
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function shuffle<T>(arr: T[]): T[] {
@@ -139,12 +142,16 @@ export function startNightPhase(room: ServerRoom, io: IO): void {
         if (p.isAlive) p.nightActionDone = false;
     }
 
-    const durationMs = room.settings.nightTimer * 1000;
-    room.timerExpiresAt = Date.now() + durationMs;
+    // Purely action-based — no timer. Every alive night role must complete
+    // its action (tryResolveNightEarly, called after each action) before the
+    // village wakes up.
+    room.timerExpiresAt = null;
 
     emitPhase(io, room);
 
-    room.activeTimer = setTimeout(() => resolveNight(room, io), durationMs);
+    // Covers the edge case where no alive role has anything left to do this
+    // round (e.g. the detective already used their one-time power earlier).
+    tryResolveNightEarly(room, io);
 }
 
 export function resolveNight(room: ServerRoom, io: IO): void {
@@ -295,6 +302,14 @@ export function resolveVotes(room: ServerRoom, io: IO): void {
     if (room.phase !== 'voting') return;
     clearActive(room);
 
+    // Anyone alive who never cast a vote (timer ran out on them) is
+    // automatically recorded as an abstain before tallying.
+    for (const p of room.players.values()) {
+        if (p.isAlive && !room.votes.has(p.playerId)) {
+            room.votes.set(p.playerId, ABSTAIN_KEY);
+        }
+    }
+
     // Build tally: targetId → [voterIds]
     const tally: Record<string, string[]> = {};
     for (const [voterId, targetId] of room.votes) {
@@ -304,11 +319,12 @@ export function resolveVotes(room: ServerRoom, io: IO): void {
     let max = 0;
     const leaders: string[] = [];
     for (const [t, voters] of Object.entries(tally)) {
+        if (t === ABSTAIN_KEY) continue; // abstains never elect an elimination target
         if (voters.length > max) { max = voters.length; leaders.length = 0; leaders.push(t); }
         else if (voters.length === max) leaders.push(t);
     }
 
-    const allAbstained = room.votes.size === 0;
+    const allAbstained = Array.from(room.votes.values()).every(t => t === ABSTAIN_KEY);
     const tie = leaders.length !== 1 || max === 0;
     let eliminated: VoteResult['eliminated'] = null;
 
@@ -374,12 +390,12 @@ export function endGame(room: ServerRoom, io: IO, winner: Winner): void {
 
     // Auto-reset to lobby after 60 s in case host doesn't click "play again"
     room.activeTimer = setTimeout(() => {
-        resetRoomToLobby(room);
+        resetRoomToLobby(room, io);
         broadcastRoomUpdate(io, room);
     }, 60_000);
 }
 
-export function resetRoomToLobby(room: ServerRoom): void {
+export function resetRoomToLobby(room: ServerRoom, io: IO): void {
     clearActive(room);
     room.phase = 'lobby';
     room.round = 0;
@@ -401,4 +417,13 @@ export function resetRoomToLobby(room: ServerRoom): void {
     room.votes = new Map();
     room.discussionExtensions = 0;
     room.voteExtended = false;
+
+    emitPhase(io, room);
+}
+
+// ─── Discussion — host early-end ───────────────────────────────────────────────
+
+export function endDiscussion(room: ServerRoom, io: IO): void {
+    if (room.phase !== 'discussion') return;
+    startVotingPhase(room, io);
 }

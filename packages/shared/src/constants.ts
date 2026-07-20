@@ -26,19 +26,19 @@ export const MAX_PLAYERS = 15;
 
 // Timers (seconds) — default values
 export const DEFAULT_DISCUSSION_TIMER = 150;
-export const DEFAULT_VOTE_TIMER = 10;
-export const DEFAULT_NIGHT_TIMER = 10;
+export const DEFAULT_VOTE_TIMER = 15;
 
-// Timer ranges (validate `room:settings`)
-export const DISCUSSION_TIMER_OPTIONS = [60, 120, 150, 180, 240, 300];
-export const VOTE_TIMER_OPTIONS = [10, 15, 20, 30];
-export const NIGHT_TIMER_OPTIONS = [10, 15, 20, 30];
+// Timer ranges (validate `room:settings`) — increment/decrement stepper, step of 15s.
+export const TIMER_STEP_SECONDS = 15;
+export const DISCUSSION_TIMER_MIN_SECONDS = 15;
+export const DISCUSSION_TIMER_MAX_SECONDS = 300;
+export const VOTE_TIMER_MIN_SECONDS = 15;
+export const VOTE_TIMER_MAX_SECONDS = 30;
 
 // Default settings (apply on room creation)
 export const DEFAULT_SETTINGS: RoomSettings = {
     discussionTimer: DEFAULT_DISCUSSION_TIMER,
     voteTimer: DEFAULT_VOTE_TIMER,
-    nightTimer: DEFAULT_NIGHT_TIMER,
     roleRevealOnDeath: true,
     allowHostExtension: true,
     soundEffects: true,

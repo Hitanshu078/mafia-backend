@@ -38,11 +38,12 @@ export interface ClientEvents {
     'game:acknowledge_role': () => void;
 
     // Night actions
-    'game:night_action': (data: { targetId: string }) => void;
+    'game:night_action': (data: { targetId: string | null }) => void;
 
     // Day actions
-    'game:vote': (data: { targetId: string }) => void;
+    'game:vote': (data: { targetId: string | null }) => void;
     'game:extend_timer': () => void;
+    'game:end_discussion': () => void;
 
     // Post-game
     'game:play_again': () => void;

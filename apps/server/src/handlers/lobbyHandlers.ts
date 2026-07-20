@@ -1,11 +1,17 @@
 import type { Socket, Server } from 'socket.io';
 import type { ClientEvents, ServerEvents } from '@mafia/shared';
 import {
-    DISCUSSION_TIMER_OPTIONS,
-    VOTE_TIMER_OPTIONS,
-    NIGHT_TIMER_OPTIONS,
+    DISCUSSION_TIMER_MIN_SECONDS,
+    DISCUSSION_TIMER_MAX_SECONDS,
+    VOTE_TIMER_MIN_SECONDS,
+    VOTE_TIMER_MAX_SECONDS,
+    TIMER_STEP_SECONDS,
     MAX_PLAYERS,
 } from '@mafia/shared';
+
+function isValidTimer(value: number, min: number, max: number): boolean {
+    return value >= min && value <= max && (value - min) % TIMER_STEP_SECONDS === 0;
+}
 import { roomManager } from '../room/roomManager.js';
 import { broadcastRoomUpdate, emitHostTransferred } from '../utils/broadcast.js';
 import { parsePayload } from '../utils/validate.js';
@@ -179,9 +185,8 @@ export function registerLobbyHandlers(socket: Sock, io: IO): void {
         const requester = Array.from(room.players.values()).find(p => p.socketId === socket.id);
         if (!requester || room.hostId !== requester.playerId || room.phase !== 'lobby') return;
 
-        if (data.discussionTimer !== undefined && !DISCUSSION_TIMER_OPTIONS.includes(data.discussionTimer)) return;
-        if (data.voteTimer !== undefined && !VOTE_TIMER_OPTIONS.includes(data.voteTimer)) return;
-        if (data.nightTimer !== undefined && !NIGHT_TIMER_OPTIONS.includes(data.nightTimer)) return;
+        if (data.discussionTimer !== undefined && !isValidTimer(data.discussionTimer, DISCUSSION_TIMER_MIN_SECONDS, DISCUSSION_TIMER_MAX_SECONDS)) return;
+        if (data.voteTimer !== undefined && !isValidTimer(data.voteTimer, VOTE_TIMER_MIN_SECONDS, VOTE_TIMER_MAX_SECONDS)) return;
 
         Object.assign(room.settings, data);
         roomManager.touch(room);
